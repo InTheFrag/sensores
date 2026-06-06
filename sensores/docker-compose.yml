@@ -1,0 +1,106 @@
+version: "3.8"
+
+services:
+
+  # ─── Base de datos PostgreSQL ───────────────────────────
+  postgres:
+    image: postgres:15
+    container_name: db_clima
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: clima_db
+      POSTGRES_USER: clima_user
+      POSTGRES_PASSWORD: clima_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./api/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - red_clima
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clima_user -d clima_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ─── API Instancia 1 ────────────────────────────────────
+  api1:
+    build: ./api
+    container_name: api_1
+    environment:
+      API_INSTANCE: "API-1"
+      DB_HOST: postgres
+      DB_NAME: clima_db
+      DB_USER: clima_user
+      DB_PASSWORD: clima_pass
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - red_clima
+
+  # ─── API Instancia 2 ────────────────────────────────────
+  api2:
+    build: ./api
+    container_name: api_2
+    environment:
+      API_INSTANCE: "API-2"
+      DB_HOST: postgres
+      DB_NAME: clima_db
+      DB_USER: clima_user
+      DB_PASSWORD: clima_pass
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - red_clima
+
+  # ─── API Instancia 3 ────────────────────────────────────
+  api3:
+    build: ./api
+    container_name: api_3
+    environment:
+      API_INSTANCE: "API-3"
+      DB_HOST: postgres
+      DB_NAME: clima_db
+      DB_USER: clima_user
+      DB_PASSWORD: clima_pass
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - red_clima
+
+  # ─── Nginx Load Balancer ─────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_lb
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api1
+      - api2
+      - api3
+    networks:
+      - red_clima
+
+  # ─── Simulador de sensores ───────────────────────────────
+  sensor:
+    build: ./sensor
+    container_name: sensor_clima
+    environment:
+      LB_URL: "http://nginx/temperatura"
+      INTERVALO_SEGUNDOS: "30"
+    depends_on:
+      - nginx
+    networks:
+      - red_clima
+
+networks:
+  red_clima:
+    driver: bridge
+
+volumes:
+  postgres_data:
