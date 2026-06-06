@@ -1,0 +1,2 @@
+# sensores
+trabajo en equipo
